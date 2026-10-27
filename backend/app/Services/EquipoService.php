@@ -30,26 +30,61 @@ class EquipoService
      */
     public function listar(?string $q, ?string $estado, int $porPagina): LengthAwarePaginator
     {
-        // TODO
+        return Equipo::with('categoria')
+            ->when($q, function ($query, $busqueda) {
+                $query->where(function ($sub) use ($busqueda) {
+                    $sub->where('codigo', 'like', "%{$busqueda}%")
+                        ->orWhere('nombre', 'like', "%{$busqueda}%");
+                });
+            })
+            ->when($estado, fn ($query, $est) => $query->where('estado', $est))
+            ->orderBy('codigo')
+            ->paginate($porPagina);
     }
 
     public function crear(array $datos): Equipo
     {
-        // TODO: devuelva el equipo con la categoría cargada
+        if (empty($datos['estado'])) {
+            unset($datos['estado']);
+        }
+
+        $equipo = Equipo::create($datos);
+
+        return $equipo->load('categoria');
     }
 
     public function actualizar(Equipo $equipo, array $datos): Equipo
     {
-        // TODO: devuelva el equipo actualizado con la categoría cargada
+        if (array_key_exists('estado', $datos) && $datos['estado'] === null) {
+            unset($datos['estado']);
+        }
+
+        $equipo->update($datos);
+
+        return $equipo->load('categoria');
     }
 
     public function eliminar(Equipo $equipo): void
     {
-        // TODO: aplique R1
+        if ($equipo->estado === 'prestado') {
+            throw new ReglaNegocioException('No se puede eliminar un equipo prestado.');
+        }
+
+        $equipo->delete();
     }
 
     public function prestar(Equipo $equipo): Equipo
     {
-        // TODO: aplique R2 y cambie el estado a "prestado"
+        if ($equipo->estado === 'mantenimiento') {
+            throw new ReglaNegocioException('No se puede prestar un equipo en mantenimiento.');
+        }
+
+        if ($equipo->estado === 'prestado') {
+            throw new ReglaNegocioException('El equipo ya se encuentra prestado.');
+        }
+
+        $equipo->update(['estado' => 'prestado']);
+
+        return $equipo->load('categoria');
     }
 }
