@@ -25,5 +25,78 @@ const $btnGuardar = document.querySelector("#btn-guardar");
  *     - Siempre (finally): rehabilite el botón y restaure su texto.
  */
 export const iniciarFormulario = ({ alGuardar }) => {
-  // TODO
+  const cargarCategorias = async () => {
+    try {
+      const { data } = await listarCategorias();
+      while ($selectCategoria.options.length > 1) {
+        $selectCategoria.remove(1);
+      }
+      for (const categoria of data ?? []) {
+        const $option = document.createElement("option");
+        $option.value = categoria.id;
+        $option.textContent = categoria.nombre;
+        $selectCategoria.append($option);
+      }
+    } catch (error) {
+      mostrarMensaje("error", error.message || "No se pudieron cargar las categorías.");
+    }
+  };
+
+  cargarCategorias();
+
+  $form.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+
+    $form.querySelectorAll("[data-error]").forEach(($p) => {
+      $p.textContent = "";
+    });
+    $form.querySelectorAll("[aria-invalid]").forEach(($campo) => {
+      $campo.removeAttribute("aria-invalid");
+    });
+
+    const formData = new FormData($form);
+    const catRaw = formData.get("categoria_id");
+    const costoRaw = formData.get("costo_interno");
+
+    const datos = {
+      codigo: formData.get("codigo")?.trim() ?? "",
+      nombre: formData.get("nombre")?.trim() ?? "",
+      categoria_id: catRaw === "" || catRaw === null ? null : Number(catRaw),
+      fecha_adquisicion: formData.get("fecha_adquisicion") ?? "",
+      costo_interno: costoRaw === "" || costoRaw === null ? null : Number(costoRaw),
+    };
+
+    const textoOriginal = $btnGuardar.textContent;
+    $btnGuardar.disabled = true;
+    $btnGuardar.textContent = "Guardando…";
+
+    try {
+      const respuesta = await crearEquipo(datos);
+      const equipo = respuesta?.data ?? respuesta;
+
+      $form.reset();
+      mostrarMensaje("exito", `Equipo ${equipo?.codigo ?? datos.codigo} registrado.`);
+      if (typeof alGuardar === "function") {
+        alGuardar();
+      }
+    } catch (error) {
+      if (error.status === 422 && error.datos?.errors) {
+        for (const [campo, mensajes] of Object.entries(error.datos.errors)) {
+          const $error = $form.querySelector(`[data-error="${campo}"]`);
+          if ($error && Array.isArray(mensajes) && mensajes.length > 0) {
+            $error.textContent = mensajes[0];
+          }
+          const $input = $form.querySelector(`[name="${campo}"]`);
+          if ($input) {
+            $input.setAttribute("aria-invalid", "true");
+          }
+        }
+      } else {
+        mostrarMensaje("error", error.message || "No se pudo registrar el equipo.");
+      }
+    } finally {
+      $btnGuardar.disabled = false;
+      $btnGuardar.textContent = textoOriginal;
+    }
+  });
 };
