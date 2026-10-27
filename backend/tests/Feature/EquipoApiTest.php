@@ -18,13 +18,55 @@ beforeEach(function () {
 });
 
 it('crea un equipo y responde 201 con el encabezado Location', function () {
-    // TODO
-})->todo();
+    $categoria = Categoria::factory()->create();
+
+    $response = $this->postJson('/api/equipos', [
+        'codigo'            => 'EQ-1234',
+        'nombre'            => 'Laptop Dell Latitude 5440',
+        'categoria_id'      => $categoria->id,
+        'fecha_adquisicion' => '2026-09-15',
+        'costo_interno'     => 450000,
+    ]);
+
+    $response->assertCreated()
+        ->assertHeader('Location')
+        ->assertJsonStructure([
+            'data' => ['id', 'codigo', 'nombre', 'estado', 'fecha_adquisicion', 'categoria' => ['id', 'nombre']],
+        ]);
+
+    $this->assertDatabaseHas('equipos', [
+        'codigo' => 'EQ-1234',
+        'nombre' => 'Laptop Dell Latitude 5440',
+    ]);
+});
 
 it('rechaza un equipo con datos inválidos y responde 422 con errores por campo', function () {
-    // TODO
-})->todo();
+    $this->postJson('/api/equipos', [
+        'codigo'            => 'INVALIDO',
+        'nombre'            => 'AB',
+        'categoria_id'      => 99999,
+        'fecha_adquisicion' => '2099-12-31',
+        'costo_interno'     => -50,
+    ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'codigo',
+            'nombre',
+            'categoria_id',
+            'fecha_adquisicion',
+            'costo_interno',
+        ]);
+});
 
 it('impide eliminar un equipo prestado y responde 409', function () {
-    // TODO
-})->todo();
+    $equipo = Equipo::factory()->prestado()->create();
+
+    $this->deleteJson("/api/equipos/{$equipo->id}")
+        ->assertStatus(409)
+        ->assertExactJson([
+            'mensaje' => 'No se puede eliminar un equipo prestado.',
+            'codigo'  => 'REGLA_NEGOCIO',
+        ]);
+
+    $this->assertDatabaseHas('equipos', ['id' => $equipo->id]);
+});
