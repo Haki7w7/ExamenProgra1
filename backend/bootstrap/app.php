@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ReglaNegocioException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -32,4 +33,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Además, evite que estas excepciones se registren en la bitácora:
         // no son errores del sistema, son reglas del dominio.
         // ---------------------------------------------------------------
+        $exceptions->dontReport(ReglaNegocioException::class);
+
+        $exceptions->render(function (ReglaNegocioException $e) {
+            return response()->json([
+                'mensaje' => $e->getMessage(),
+                'codigo'  => 'REGLA_NEGOCIO',
+            ], 409);
+        });
     })->create();
